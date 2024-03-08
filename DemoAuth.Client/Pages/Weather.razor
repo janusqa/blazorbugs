@@ -1,8 +1,9 @@
-﻿@inherits Fluxor.Blazor.Web.Components.FluxorComponent
+﻿@* @inherits Fluxor.Blazor.Web.Components.FluxorComponent *@
 
 @page "/weather"
 @rendermode @(new InteractiveWebAssemblyRenderMode(prerender:false))
 
+@implements IDisposable
 @inject IState<AppState.Weather.WeatherForecastState> WeatherForecastState
 @inject IDispatcher dispatcher
 
@@ -44,16 +45,51 @@ else
 @code {
     private Models.WeatherForecast[]? forecasts;
 
+    //Hacky fix 1a
+    //private int ForecastsInitilized;
+
     protected override async Task OnInitializedAsync()
     {
+        Console.WriteLine("** OnInitializedAsync");
         await Task.CompletedTask;
-        dispatcher.Dispatch(new AppState.Weather.WeatherForecastFetched());
+        if (WeatherForecastState.Value.Forecasts is null)
+            dispatcher.Dispatch(new AppState.Weather.WeatherForecastFetched());
+
         if (WeatherForecastState.Value.Forecasts is not null) forecasts = WeatherForecastState.Value.Forecasts;
     }
 
-    protected override async Task OnAfterRenderAsync(bool firsRender)
+    protected override void OnAfterRender(bool firstRender)
     {
-        await Task.CompletedTask;
+        // Hacky fix 1b
+        // ForecastsInitilized = WeatherForecastState.Value.Forecasts is not null ? ++ForecastsInitilized : ForecastsInitilized;
+
+        if (firstRender) Console.WriteLine("** OnAfterRender");
+        Console.WriteLine("** OnAfterRender");
+
         if (WeatherForecastState.Value.Forecasts is not null) forecasts = WeatherForecastState.Value.Forecasts;
+
+        // Hacky fix 1c
+        // if (WeatherForecastState.Value.Forecasts is not null && ForecastsInitilized == 1)
+        // {
+        // forecasts = WeatherForecastState.Value.Forecasts;
+        // InvokeAsync(StateHasChanged);
+        //}
+    }
+
+    // Fluxor Plumbing
+    protected override void OnInitialized()
+    {
+        WeatherForecastState.StateChanged += AppStateHasChanged;
+    }
+
+    private void AppStateHasChanged(object? sender, EventArgs args)
+    {
+        Console.WriteLine("** AppStateHasChanged");
+        InvokeAsync(StateHasChanged);
+    }
+
+    public void Dispose()
+    {
+        WeatherForecastState.StateChanged -= AppStateHasChanged;
     }
 }
