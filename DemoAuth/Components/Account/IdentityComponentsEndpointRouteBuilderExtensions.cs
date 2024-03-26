@@ -9,6 +9,7 @@ using Microsoft.Extensions.Primitives;
 using DemoAuth.Components.Account.Pages;
 using DemoAuth.Components.Account.Pages.Manage;
 using DemoAuth.Data;
+using DemoAuth.Models;
 
 namespace Microsoft.AspNetCore.Routing;
 

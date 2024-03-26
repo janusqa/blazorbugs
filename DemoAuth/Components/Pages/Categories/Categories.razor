@@ -1,0 +1,61 @@
+@page "/categories"
+@attribute [StreamRendering]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+
+<PageTitle>Products</PageTitle>
+
+@inject IUnitOfWork _uow
+@inject IJSRuntime _jsruntime
+@inject IHttpClientFactory _hc
+
+<div>
+    <h3 class="card-title text-primary mb-3 ml-3">Categories</h3>
+    <SfGrid @ref="sfGridRef" TValue="Category" AllowPaging="true"
+        Toolbar="@(new List<string>() { "Add", "Cancel", "Update" })">
+        <SfDataManager Url="api/v1/categories/odata" Adaptor="Syncfusion.Blazor.Adaptors.WebApiAdaptor"
+            HttpClientInstance=@(_hc.CreateClient("DemoAuth"))>
+        </SfDataManager>
+        <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
+        <GridPageSettings PageSize="1" PageCount="5" PageSizes="true" />
+        <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" ShowDeleteConfirmDialog="true"
+            Mode="EditMode.Normal" />
+        <GridEvents OnActionFailure="OnActionFailure" TValue="Category" />
+        <GridColumns>
+            <GridColumn Field=@nameof(Category.Id) HeaderText="Id" IsPrimaryKey="true" Visible="false" />
+            <GridColumn Field=@nameof(Category.Name) HeaderText="Name" />
+            <GridColumn HeaderText="Manage">
+                <GridCommandColumns>
+                    <GridCommandColumn Type="CommandButtonType.Edit"
+                        ButtonOption="@(new CommandButtonOptions() {IconCss="e-icons e-edit", CssClass="e-flat" })">
+                    </GridCommandColumn>
+                    <GridCommandColumn Type="CommandButtonType.Delete"
+                        ButtonOption="@(new CommandButtonOptions() {IconCss="e-icons e-delete", CssClass="e-flat" })">
+                    </GridCommandColumn>
+                    <GridCommandColumn Type="CommandButtonType.Save"
+                        ButtonOption="@(new CommandButtonOptions() {IconCss="e-icons e-save", CssClass="e-flat" })">
+                    </GridCommandColumn>
+                    <GridCommandColumn Type="CommandButtonType.Cancel"
+                        ButtonOption="@(new CommandButtonOptions() {IconCss="e-icons e-cancel-icon", CssClass="e-flat" })">
+                    </GridCommandColumn>
+                </GridCommandColumns>
+            </GridColumn>
+        </GridColumns>
+    </SfGrid>
+</div>
+
+@code {
+    // syncfuscion
+    private SfGrid<Category>? sfGridRef;
+
+    private async void OnActionFailure(FailureEventArgs args)
+    {
+        Console.WriteLine(args.Error.Message);
+        Console.WriteLine(args.Error.InnerException?.Message);
+        Console.WriteLine("---");
+        Console.WriteLine(args.Error.InnerException?.StackTrace);
+        Console.WriteLine("---");
+        Console.WriteLine(args.Error.StackTrace);
+
+        await Task.CompletedTask;
+    }
+}

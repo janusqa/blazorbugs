@@ -1,5 +1,5 @@
+using DemoAuth.Models;
 using Microsoft.AspNetCore.Identity;
-using DemoAuth.Data;
 
 namespace DemoAuth.Components.Account;
 

@@ -7,7 +7,7 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Options;
 using DemoAuth.Client;
-using DemoAuth.Data;
+using DemoAuth.Models;
 
 namespace DemoAuth.Components.Account;
 

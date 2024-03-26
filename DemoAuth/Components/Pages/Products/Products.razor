@@ -1,0 +1,162 @@
+@page "/products"
+@attribute [StreamRendering]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@* @attribute [Authorize(Roles = "Admin")] *@
+
+<PageTitle>Products</PageTitle>
+
+@inject IUnitOfWork _uow
+@inject IJSRuntime _jsruntime
+
+<div>
+    <h3 class="card-title text-primary mb-3 ml-3">Products</h3>
+    @if (ProductList is null)
+    {
+        <div style="position:fixed;top:50%;left:50%;margin-top:-50px;margin-left:-100px;">
+            <img src="images/loader.gif" alt="Loading..." />
+        </div>
+    }
+    else
+    {
+        <SfGrid @ref="sfGridRef" DataSource="@ProductList" AllowPaging="true" AllowFiltering="true" AllowSorting="true"
+            Toolbar="@(new List<string>() { "Add", "Cancel", "Update" })">
+            <GridFilterSettings Type="Syncfusion.Blazor.Grids.FilterType.Menu" />
+            <GridPageSettings PageSize="20" PageCount="5" PageSizes="true" />
+            <GridEditSettings AllowAdding="true" AllowEditing="true" AllowDeleting="true" ShowDeleteConfirmDialog="true"
+                Mode="EditMode.Normal" />
+            <GridEvents OnActionBegin="OnGridActionBegin" OnActionComplete="OnGridActionComplete" TValue="Product" />
+            <GridColumns>
+                <GridColumn Field=@nameof(Product.Id) HeaderText="Id" IsPrimaryKey="true" Visible="false" />
+                <GridColumn Field=@nameof(Product.Name) HeaderText="Name" />
+                <GridColumn Field=@nameof(Product.Price) HeaderText="Price" Format="C2" />
+                <GridColumn Field=@nameof(Product.CategoryId) HeaderText="Category">
+                    <EditTemplate>
+                        <select @bind="@((context as Product)!.CategoryId)" @bind:event="oninput"
+                            class="form-select select2-categoryid" aria-required="true"
+                            data-placeholder="-- Select Category # --">
+                            @if ((context as Product)!.CategoryId > 0)
+                            {
+                                <option value="@((context as Product)!.CategoryId)" selected="selected">
+                                    @((context as Product)!.Category?.Name)
+                                </option>
+                            }
+                        </select>
+                    </EditTemplate>
+                </GridColumn>
+                <GridColumn HeaderText="Manage">
+                    <GridCommandColumns>
+                        <GridCommandColumn Type="CommandButtonType.Edit"
+                            ButtonOption="@(new CommandButtonOptions() {IconCss="e-icons e-edit", CssClass="e-flat" })">
+                        </GridCommandColumn>
+                        <GridCommandColumn Type="CommandButtonType.Delete"
+                            ButtonOption="@(new CommandButtonOptions() {IconCss="e-icons e-delete", CssClass="e-flat" })">
+                        </GridCommandColumn>
+                        <GridCommandColumn Type="CommandButtonType.Save"
+                            ButtonOption="@(new CommandButtonOptions() {IconCss="e-icons e-save", CssClass="e-flat" })">
+                        </GridCommandColumn>
+                        <GridCommandColumn Type="CommandButtonType.Cancel"
+                            ButtonOption="@(new CommandButtonOptions() {IconCss="e-icons e-cancel-icon", CssClass="e-flat" })">
+                        </GridCommandColumn>
+                    </GridCommandColumns>
+                </GridColumn>
+            </GridColumns>
+        </SfGrid>
+    }
+</div>
+
+@code {
+    private List<Product>? ProductList { get; set; }
+
+    // syncfuscion
+    private SfGrid<Product>? sfGridRef;
+
+    protected override async Task OnInitializedAsync()
+    {
+        var products = await Get();
+        // var p = products.ToList();
+        // Console.WriteLine($"{p[0].Name}, {p[0].Category?.Name}");
+
+        if (products is not null)
+        {
+            ProductList ??= products.ToList();
+        }
+        else
+        {
+            ProductList ??= [];
+        }
+    }
+
+    private async Task<IEnumerable<Product>> Get()
+    {
+        return (await _uow.Products.SqlQueryAsync<ProductCategoryIncluded>(@"
+SELECT p.*, c.Name AS CategoryName FROM Products p INNER JOIN Categories c ON (p.CategoryId = c.Id);
+", []))
+        .Select(p =>
+        new Product
+            {
+                Id = p.Id,
+                Name = p.Name,
+                Price = p.Price,
+                CategoryId = p.CategoryId,
+                Category = new Category { Id = p.CategoryId, Name = p.CategoryName }
+            });
+    }
+
+    private async Task Upsert(Product product)
+    {
+        await _uow.Products.ExecuteSqlAsync(@"
+INSERT INTO Products
+(Id, Name, Price, CategoryId)
+VALUES (@Id, @Name, @Price, @CategoryId)
+ON CONFLICT(Id) DO UPDATE SET
+Name = EXCLUDED.Name,
+Price = EXCLUDED.Price,
+CategoryId = CategoryId;
+", [
+        new SqliteParameter("Id", product.Id > 0 ? product.Id : (object)DBNull.Value),
+new SqliteParameter("Name", product.Name),
+new SqliteParameter("Price", product.Price),
+new SqliteParameter("CategoryId", product.CategoryId)
+        ]);
+    }
+
+    private async Task Delete(Product product)
+    {
+        var rowsAffected = await _uow.Products.ExecuteSqlAsync(@"
+DELETE FROM Products WHERE Id = @Id;
+", [new SqliteParameter("Id", product.Id)]);
+    }
+
+    private async void OnGridActionComplete(ActionEventArgs<Product> args)
+    {
+        if (args.RequestType.Equals(Syncfusion.Blazor.Grids.Action.Save) ||
+        args.RequestType.Equals(Syncfusion.Blazor.Grids.Action.Delete))
+        {
+            ProductList = (await Get()).ToList();
+        }
+    }
+
+    private async void OnGridActionBegin(ActionEventArgs<Product> args)
+    {
+        if (
+        args.RequestType.Equals(Syncfusion.Blazor.Grids.Action.BeforeBeginEdit) ||
+        args.RequestType.Equals(Syncfusion.Blazor.Grids.Action.Add)
+        )
+        {
+            await _jsruntime.InvokeVoidAsync(
+            "blazorInterop.select2ObserverInit",
+            "select2-categoryid",
+            "/api/v1/categories/paginated"
+            );
+        }
+
+        if (args.RequestType.Equals(Syncfusion.Blazor.Grids.Action.Save))
+        {
+            await Upsert(args.Data);
+        }
+        else if (args.RequestType.Equals(Syncfusion.Blazor.Grids.Action.Delete))
+        {
+            await Delete(args.Data);
+        }
+    }
+}
